@@ -236,6 +236,7 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
             val column = index % gridColumns
             val x = gridLeft + column * gridCellWidth
             val y = gridTop + rowIndex * gridCellHeight
+            val row = rows[index]
             val inset = dp(2f)
             val box = RectF(x + inset, y + inset, x + gridCellWidth - inset, y + gridCellHeight - inset)
             val selected = index == console.selection
@@ -250,15 +251,15 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
 
             textPaint.textSize = dp(12f)
             inversePaint.textSize = textPaint.textSize
-            val glyph = gridGlyph(rows[index].label)
+            val glyph = gridGlyph(row.label)
             canvas.drawText(glyph, x + (gridCellWidth - textPaint.measureText(glyph)) / 2f, baseline(textPaint, y + gridCellHeight * 0.34f), activePaint)
 
             textPaint.textSize = dp(8f)
             inversePaint.textSize = textPaint.textSize
-            val label = fit(rows[index].label, gridCellWidth - dp(8f))
+            val label = fit(row.label, gridCellWidth - dp(8f))
             canvas.drawText(label, x + (gridCellWidth - textPaint.measureText(label)) / 2f, baseline(textPaint, y + gridCellHeight * 0.66f), activePaint)
 
-            val info = rows[index].badge.ifEmpty { rows[index].value }
+            val info = row.badge.ifEmpty { row.value }
             if (info.isNotEmpty()) {
                 badgePaint.textSize = dp(7f)
                 inversePaint.textSize = badgePaint.textSize
