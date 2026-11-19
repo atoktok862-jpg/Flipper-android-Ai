@@ -3,7 +3,7 @@
     <color name="amber">#FFB347</color>
     <color name="amber_bright">#FFD08A</color>
     <color name="amber_dim">#7A5218</color>
-    <color name="void">#0B0905</color>
+    <color name="void_bg">#0B0905</color>
     <color name="void_soft">#171005</color>
     <color name="key_face">#3A2B18</color>
     <color name="key_edge">#110C06</color>
