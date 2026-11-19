@@ -9,6 +9,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.View
+import com.pocketmultitool.app.core.ConsoleRow
 import com.pocketmultitool.app.core.RetroConsole
 import com.pocketmultitool.app.flipper.FlipperTheme
 import java.text.SimpleDateFormat
@@ -25,6 +26,7 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
     private val bgPaint = Paint()
     private val headerPaint = Paint()
     private val linePaint = Paint()
+    private val cellPaint = Paint().apply { style = Paint.Style.STROKE }
     private val selectionPaint = Paint()
     private val textPaint = Paint().apply { typeface = Typeface.MONOSPACE }
     private val titlePaint = Paint().apply { typeface = Typeface.MONOSPACE }
@@ -40,6 +42,14 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
     private var firstVisible = 0
     private var visibleCount = 0
 
+    private var gridMode = false
+    private var gridLeft = 0f
+    private var gridTop = 0f
+    private var gridCellWidth = 0f
+    private var gridCellHeight = 0f
+    private var gridColumns = 3
+    private var gridCount = 0
+
     private fun applyPalette() {
         val name = prefs.getString("lcd_theme", "GREEN") ?: "GREEN"
         if (name == paletteName) return
@@ -48,6 +58,8 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
         bgPaint.color = Color.parseColor(palette.bg)
         headerPaint.color = Color.parseColor(palette.header)
         linePaint.color = Color.parseColor(palette.dim)
+        cellPaint.color = Color.parseColor(palette.dim)
+        cellPaint.strokeWidth = dp(1f)
         selectionPaint.color = Color.parseColor(palette.text)
         textPaint.color = Color.parseColor(palette.text)
         titlePaint.color = Color.parseColor(palette.text)
@@ -70,9 +82,19 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
     }
 
     fun rowAt(y: Float): Int {
+        if (gridMode) return -1
         if (visibleCount == 0 || y < rowTop) return -1
         val index = floor((y - rowTop) / rowHeight).toInt()
         return if (index in 0 until visibleCount) firstVisible + index else -1
+    }
+
+    fun itemAt(x: Float, y: Float): Int {
+        if (!gridMode) return rowAt(y)
+        val column = floor((x - gridLeft) / gridCellWidth).toInt()
+        val row = floor((y - gridTop) / gridCellHeight).toInt()
+        if (column !in 0 until gridColumns || row < 0) return -1
+        val index = row * gridColumns + column
+        return if (index < gridCount) index else -1
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -118,50 +140,62 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
             top = dst.bottom + dp(5f)
         }
 
-        rowHeight = dp(if (picture != null) 15f else 21f)
-        visibleCount = maxOf(0, floor((bottom - top) / rowHeight).toInt())
         if (console.selection >= rows.size) console.resetSelection()
-        if (console.selection < console.scroll) console.scroll = console.selection
-        if (visibleCount > 0 && console.selection >= console.scroll + visibleCount) {
-            console.scroll = console.selection - visibleCount + 1
-        }
-        if (console.scroll < 0) console.scroll = 0
-        firstVisible = console.scroll
-        rowTop = top
 
-        textPaint.textSize = dp(if (picture != null) 9f else 11f)
-        titlePaint.textSize = dp(if (picture != null) 10f else 11f)
-        inversePaint.textSize = textPaint.textSize
-        badgePaint.textSize = dp(8f)
-        val valueRight = w - dp(7f)
+        val useGrid = picture == null && rows.size >= 6 && screen.title == "FLIPPER ZERO"
+        gridMode = useGrid
 
-        for (i in 0 until visibleCount) {
-            val index = firstVisible + i
-            if (index >= rows.size) break
-            val row = rows[index]
-            val y = top + i * rowHeight
-            val selected = index == console.selection
-            if (selected) {
-                canvas.drawRect(pad - dp(3f), y, w - pad + dp(3f), y + rowHeight - dp(1f), selectionPaint)
+        if (useGrid) {
+            console.scroll = 0
+            firstVisible = 0
+            visibleCount = rows.size
+            rowTop = top
+            drawGridMenu(canvas, rows, top, bottom, pad, w)
+        } else {
+            rowHeight = dp(if (picture != null) 15f else 21f)
+            visibleCount = maxOf(0, floor((bottom - top) / rowHeight).toInt())
+            if (console.selection < console.scroll) console.scroll = console.selection
+            if (visibleCount > 0 && console.selection >= console.scroll + visibleCount) {
+                console.scroll = console.selection - visibleCount + 1
             }
-            val activePaint = if (selected) inversePaint else if (row.enabled) textPaint else dimPaint
-            val labelX = pad + dp(3f)
-            val rightReserve = when {
-                row.value.isNotEmpty() && row.badge.isNotEmpty() -> dp(112f)
-                row.value.isNotEmpty() || row.badge.isNotEmpty() -> dp(66f)
-                else -> dp(4f)
-            }
-            val lineY = baseline(activePaint, y + rowHeight * 0.62f)
-            canvas.drawText(fit(row.label, w - labelX - rightReserve), labelX, lineY, activePaint)
-            var valueX = valueRight
-            if (row.badge.isNotEmpty()) {
-                val badge = fit(row.badge, dp(42f))
-                canvas.drawText(badge, valueX - badgePaint.measureText(badge), lineY, if (selected) inversePaint else badgePaint)
-                valueX -= dp(46f)
-            }
-            if (row.value.isNotEmpty()) {
-                val value = fit(row.value, dp(58f))
-                canvas.drawText(value, valueX - activePaint.measureText(value), lineY, activePaint)
+            if (console.scroll < 0) console.scroll = 0
+            firstVisible = console.scroll
+            rowTop = top
+
+            textPaint.textSize = dp(if (picture != null) 9f else 11f)
+            titlePaint.textSize = dp(if (picture != null) 10f else 11f)
+            inversePaint.textSize = textPaint.textSize
+            badgePaint.textSize = dp(8f)
+            val valueRight = w - dp(7f)
+
+            for (i in 0 until visibleCount) {
+                val index = firstVisible + i
+                if (index >= rows.size) break
+                val row = rows[index]
+                val y = top + i * rowHeight
+                val selected = index == console.selection
+                if (selected) {
+                    canvas.drawRect(pad - dp(3f), y, w - pad + dp(3f), y + rowHeight - dp(1f), selectionPaint)
+                }
+                val activePaint = if (selected) inversePaint else if (row.enabled) textPaint else dimPaint
+                val labelX = pad + dp(3f)
+                val rightReserve = when {
+                    row.value.isNotEmpty() && row.badge.isNotEmpty() -> dp(112f)
+                    row.value.isNotEmpty() || row.badge.isNotEmpty() -> dp(66f)
+                    else -> dp(4f)
+                }
+                val lineY = baseline(activePaint, y + rowHeight * 0.62f)
+                canvas.drawText(fit(row.label, w - labelX - rightReserve), labelX, lineY, activePaint)
+                var valueX = valueRight
+                if (row.badge.isNotEmpty()) {
+                    val badge = fit(row.badge, dp(42f))
+                    canvas.drawText(badge, valueX - badgePaint.measureText(badge), lineY, if (selected) inversePaint else badgePaint)
+                    valueX -= dp(46f)
+                }
+                if (row.value.isNotEmpty()) {
+                    val value = fit(row.value, dp(58f))
+                    canvas.drawText(value, valueX - activePaint.measureText(value), lineY, activePaint)
+                }
             }
         }
 
@@ -171,8 +205,67 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
         }
 
         dimPaint.textSize = dp(8f)
-        val footerText = fit(screen.footer, w - pad * 2)
+        val footerSource = if (gridMode) "◀▶ РАЗДЕЛ   OK ВХОД   BACK НАЗАД" else screen.footer
+        val footerText = fit(footerSource, w - pad * 2)
         canvas.drawText(footerText, (w - dimPaint.measureText(footerText)) / 2f, h - dp(5f), dimPaint)
+    }
+
+    private fun gridGlyph(label: String): String = when {
+        label.contains("NFC", ignoreCase = true) -> "NFC"
+        label.contains("INFRARED", ignoreCase = true) -> "IR"
+        label.contains("СКАНЕР", ignoreCase = true) -> "RF"
+        label.contains("ПРИЛОЖЕНИЯ", ignoreCase = true) -> "APPS"
+        label.contains("АРХИВ", ignoreCase = true) -> "ARC"
+        label.contains("ДОЛФИН", ignoreCase = true) -> "DFL"
+        label.contains("НАСТРОЙКИ", ignoreCase = true) -> "SET"
+        label.contains("ДИАГНОСТИКА", ignoreCase = true) -> "SYS"
+        label.contains("ПРОГРАММЕ", ignoreCase = true) -> "INFO"
+        else -> label.take(4)
+    }
+
+    private fun drawGridMenu(canvas: Canvas, rows: List<ConsoleRow>, top: Float, bottom: Float, pad: Float, w: Float) {
+        gridColumns = 3
+        gridCount = rows.size
+        gridLeft = pad
+        gridTop = top
+        gridCellWidth = (w - pad * 2f) / gridColumns
+        gridCellHeight = (bottom - top) / maxOf(1, (rows.size + gridColumns - 1) / gridColumns)
+
+        for (index in rows.indices) {
+            val rowIndex = index / gridColumns
+            val column = index % gridColumns
+            val x = gridLeft + column * gridCellWidth
+            val y = gridTop + rowIndex * gridCellHeight
+            val inset = dp(2f)
+            val box = RectF(x + inset, y + inset, x + gridCellWidth - inset, y + gridCellHeight - inset)
+            val selected = index == console.selection
+            if (selected) {
+                canvas.drawRect(box, selectionPaint)
+            } else {
+                canvas.drawRect(box, cellPaint)
+            }
+
+            val activePaint = if (selected) inversePaint else if (row.enabled) textPaint else dimPaint
+            val activeBadgePaint = if (selected) inversePaint else badgePaint
+
+            textPaint.textSize = dp(12f)
+            inversePaint.textSize = textPaint.textSize
+            val glyph = gridGlyph(rows[index].label)
+            canvas.drawText(glyph, x + (gridCellWidth - textPaint.measureText(glyph)) / 2f, baseline(textPaint, y + gridCellHeight * 0.34f), activePaint)
+
+            textPaint.textSize = dp(8f)
+            inversePaint.textSize = textPaint.textSize
+            val label = fit(rows[index].label, gridCellWidth - dp(8f))
+            canvas.drawText(label, x + (gridCellWidth - textPaint.measureText(label)) / 2f, baseline(textPaint, y + gridCellHeight * 0.66f), activePaint)
+
+            val info = rows[index].badge.ifEmpty { rows[index].value }
+            if (info.isNotEmpty()) {
+                badgePaint.textSize = dp(7f)
+                inversePaint.textSize = badgePaint.textSize
+                val text = fit(info, gridCellWidth - dp(8f))
+                canvas.drawText(text, x + (gridCellWidth - badgePaint.measureText(text)) / 2f, baseline(badgePaint, y + gridCellHeight * 0.88f), activeBadgePaint)
+            }
+        }
     }
 
     private fun drawStatusIcons(canvas: Canvas, w: Float) {

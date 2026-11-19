@@ -146,13 +146,16 @@ class MainActivity : Activity(), ConsoleHost {
 
     private class LcdFrame(context: Context) : FrameLayout(context) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-            val availableWidth = View.MeasureSpec.getSize(widthMeasureSpec)
-            val availableHeight = View.MeasureSpec.getSize(heightMeasureSpec)
+            val availableWidth = View.MeasureSpec.getSize(widthMeasureSpec).coerceAtLeast(dp(120f))
             val horizontalPadding = dp(9f) * 2
             val verticalPadding = dp(9f) * 2
-            val maxInnerHeight = (availableHeight - verticalPadding).coerceAtLeast(dp(60f))
-            val targetWidth = min(availableWidth, maxInnerHeight * 2 + horizontalPadding).coerceAtLeast(dp(120f))
-            setMeasuredDimension(targetWidth, (targetWidth - horizontalPadding) / 2 + verticalPadding)
+            val innerWidth = (availableWidth - horizontalPadding).coerceAtLeast(dp(120f))
+            val measuredHeight = innerWidth / 2 + verticalPadding
+            setMeasuredDimension(availableWidth, measuredHeight)
+            super.onMeasure(
+                View.MeasureSpec.makeMeasureSpec(availableWidth, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(measuredHeight, View.MeasureSpec.EXACTLY),
+            )
         }
 
         private fun dp(value: Float): Int = (value * resources.displayMetrics.density).toInt()
@@ -162,6 +165,15 @@ class MainActivity : Activity(), ConsoleHost {
         if (!::console.isInitialized) return
         action(console)
         display.invalidate()
+    }
+
+    private fun moveHorizontal(direction: Int) {
+        consoleAction { console ->
+            val size = console.rows().size
+            if (size == 0) return@consoleAction
+            val step = if (console.current().title == "FLIPPER ZERO") 3 else 1
+            console.select((console.selection + direction * step).coerceIn(0, size - 1))
+        }
     }
 
     private fun buildUi() {
@@ -196,11 +208,9 @@ class MainActivity : Activity(), ConsoleHost {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
         addPadKey(pad, "▲", 0, 1, R.drawable.bg_dpad_key, "ВВЕРХ") { consoleAction { it.up() } }
-        addPadKey(pad, "◀", 1, 0, R.drawable.bg_dpad_key, "ПРОКРУТКА ВВЕРХ") { consoleAction { it.up() } }
+        addPadKey(pad, "◀", 1, 0, R.drawable.bg_dpad_key, "ВЛЕВО") { moveHorizontal(-1) }
         addPadKey(pad, "OK", 1, 1, R.drawable.bg_dpad_center, "OK") { consoleAction { it.ok() } }
-        addPadKey(pad, "▶", 1, 2, R.drawable.bg_dpad_key, "ПРОКРУТКА ВНИЗ") {
-            consoleAction { it.down(it.rows().size) }
-        }
+        addPadKey(pad, "▶", 1, 2, R.drawable.bg_dpad_key, "ВПРАВО") { moveHorizontal(1) }
         addPadKey(pad, "▼", 2, 1, R.drawable.bg_dpad_key, "ВНИЗ") {
             consoleAction { it.down(it.rows().size) }
         }
@@ -219,7 +229,7 @@ class MainActivity : Activity(), ConsoleHost {
 
             override fun onSingleTapUp(e: MotionEvent): Boolean {
                 if (!::console.isInitialized) return false
-                val index = display.rowAt(e.y)
+                val index = display.itemAt(e.x, e.y)
                 if (index < 0) return false
                 if (index == console.selection) {
                     console.ok()
