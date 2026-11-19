@@ -10,15 +10,22 @@ import java.util.Locale
 class FlipperStore(context: Context) : JsonStore(context, "flipper_zero_store") {
     private val stamp = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
 
-    fun signals(): List<FlipperSignal> = readArray("subghz").mapNotNull { item ->
-        val obj = item as? JSONObject ?: return@mapNotNull null
-        FlipperSignal(
-            obj.optString("name", ""),
-            obj.optString("frequency", ""),
-            obj.optString("protocol", ""),
-            obj.optString("data", ""),
-            obj.optString("time", ""),
-        )
+    fun signals(): List<FlipperSignal> {
+        val array = readArray("subghz")
+        val result = mutableListOf<FlipperSignal>()
+        for (i in 0 until array.length()) {
+            val obj = array.optJSONObject(i) ?: continue
+            result.add(
+                FlipperSignal(
+                    obj.optString("name", ""),
+                    obj.optString("frequency", ""),
+                    obj.optString("protocol", ""),
+                    obj.optString("data", ""),
+                    obj.optString("time", ""),
+                )
+            )
+        }
+        return result
     }
 
     fun saveSignal(name: String, frequency: String, protocol: String, data: String) {
@@ -34,14 +41,21 @@ class FlipperStore(context: Context) : JsonStore(context, "flipper_zero_store") 
 
     fun removeSignal(name: String) = removeAt("subghz", name, "name")
 
-    fun rfidCards(): List<FlipperRfidCard> = readArray("rfid").mapNotNull { item ->
-        val obj = item as? JSONObject ?: return@mapNotNull null
-        FlipperRfidCard(
-            obj.optString("name", ""),
-            obj.optString("uid", ""),
-            obj.optString("type", ""),
-            obj.optString("time", ""),
-        )
+    fun rfidCards(): List<FlipperRfidCard> {
+        val array = readArray("rfid")
+        val result = mutableListOf<FlipperRfidCard>()
+        for (i in 0 until array.length()) {
+            val obj = array.optJSONObject(i) ?: continue
+            result.add(
+                FlipperRfidCard(
+                    obj.optString("name", ""),
+                    obj.optString("uid", ""),
+                    obj.optString("type", ""),
+                    obj.optString("time", ""),
+                )
+            )
+        }
+        return result
     }
 
     fun saveRfidCard(name: String, uid: String, type: String) {
@@ -56,13 +70,20 @@ class FlipperStore(context: Context) : JsonStore(context, "flipper_zero_store") 
 
     fun removeRfidCard(name: String) = removeAt("rfid", name, "name")
 
-    fun ibuttons(): List<FlipperIButton> = readArray("ibutton").mapNotNull { item ->
-        val obj = item as? JSONObject ?: return@mapNotNull null
-        FlipperIButton(
-            obj.optString("name", ""),
-            obj.optString("rom", ""),
-            obj.optString("time", ""),
-        )
+    fun ibuttons(): List<FlipperIButton> {
+        val array = readArray("ibutton")
+        val result = mutableListOf<FlipperIButton>()
+        for (i in 0 until array.length()) {
+            val obj = array.optJSONObject(i) ?: continue
+            result.add(
+                FlipperIButton(
+                    obj.optString("name", ""),
+                    obj.optString("rom", ""),
+                    obj.optString("time", ""),
+                )
+            )
+        }
+        return result
     }
 
     fun saveIButton(name: String, rom: String) {
@@ -76,13 +97,20 @@ class FlipperStore(context: Context) : JsonStore(context, "flipper_zero_store") 
 
     fun removeIButton(name: String) = removeAt("ibutton", name, "name")
 
-    fun scripts(): List<FlipperScript> = readArray("badusb").mapNotNull { item ->
-        val obj = item as? JSONObject ?: return@mapNotNull null
-        FlipperScript(
-            obj.optString("name", ""),
-            obj.optString("body", ""),
-            obj.optString("time", ""),
-        )
+    fun scripts(): List<FlipperScript> {
+        val array = readArray("badusb")
+        val result = mutableListOf<FlipperScript>()
+        for (i in 0 until array.length()) {
+            val obj = array.optJSONObject(i) ?: continue
+            result.add(
+                FlipperScript(
+                    obj.optString("name", ""),
+                    obj.optString("body", ""),
+                    obj.optString("time", ""),
+                )
+            )
+        }
+        return result
     }
 
     fun saveScript(name: String, body: String) {
@@ -127,7 +155,14 @@ class FlipperStore(context: Context) : JsonStore(context, "flipper_zero_store") 
         prefs.edit().putBoolean(key, value).apply()
     }
 
-    fun notifications(): List<String> = readArray("notifications").map { it.toString().trim('"') }
+    fun notifications(): List<String> {
+        val array = readArray("notifications")
+        val result = mutableListOf<String>()
+        for (i in 0 until array.length()) {
+            result.add(array.opt(i).toString().trim('"'))
+        }
+        return result
+    }
 
     fun addNotification(text: String) {
         val array = readArray("notifications")
