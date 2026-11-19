@@ -3,8 +3,8 @@
     <style name="RetroTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/flipper_shell</item>
         <item name="android:colorAccent">@color/flipper_yellow</item>
-        <item name="android:textColorPrimary">@color/lcd_green</item>
-        <item name="android:textColorSecondary">@color/flipper_yellow</item>
+        <item name="android:textColorPrimary">@color/flipper_yellow</item>
+        <item name="android:textColorSecondary">@color/lcd_green</item>
         <item name="android:statusBarColor">@color/flipper_shell_dark</item>
         <item name="android:navigationBarColor">@color/flipper_shell_dark</item>
         <item name="android:windowLightStatusBar">false</item>

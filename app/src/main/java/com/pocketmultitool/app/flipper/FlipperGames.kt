@@ -92,33 +92,3 @@ class DolphinJumpScreen(private val store: FlipperStore) : ConsoleScreen {
         host.toast("ФИНИШ: $score ОЧКОВ")
     }
 }
-
-class SpectrumScreen : ConsoleScreen {
-    override val title = "SUB-GHZ: АНАЛИЗ"
-    override val subtitle = "ДЕМО-СПЕКТР 300-1000 МГц"
-    override val footer = "OK ОБНОВИТЬ   ◀ НАЗАД"
-
-    private var bins = MutableList(12) { Random.nextInt(1, 8) }
-
-    override fun rows(host: ConsoleHost): List<ConsoleRow> {
-        val rows = ArrayList<ConsoleRow>()
-        rows.add(ConsoleRow("ЧАСТОТА", "УРОВЕНЬ"))
-        bins.forEachIndexed { index, level ->
-            val frequency = 300 + index * 64
-            val bar = "#".repeat(level).padEnd(8, '.')
-            rows.add(ConsoleRow("$frequency МГц", bar))
-        }
-        rows.add(ConsoleRow("РЕЖИМ", "ДЕМОНСТРАЦИЯ"))
-        return rows
-    }
-
-    override fun onTick(host: ConsoleHost) {
-        val index = Random.nextInt(bins.size)
-        bins[index] = Random.nextInt(1, 9)
-    }
-
-    override fun onConfirm(index: Int, host: ConsoleHost) {
-        bins = MutableList(12) { Random.nextInt(1, 9) }
-        host.vibrate(15)
-    }
-}

@@ -11,10 +11,9 @@ import android.util.AttributeSet
 import android.view.View
 import com.pocketmultitool.app.core.RetroConsole
 import com.pocketmultitool.app.flipper.FlipperTheme
+import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.text.SimpleDateFormat
-import android.os.SystemClock
 import kotlin.math.floor
 import kotlin.math.min
 
@@ -24,25 +23,15 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
 
     private val prefs: SharedPreferences = context.applicationContext.getSharedPreferences("flipper_zero_store", Context.MODE_PRIVATE)
     private val bgPaint = Paint()
-    private val gridPaint = Paint()
-    private val scanPaint = Paint().apply { color = Color.argb(18, 0, 0, 0) }
     private val headerPaint = Paint()
     private val linePaint = Paint()
-    private val selectedPaint = Paint().apply { color = Color.argb(46, 255, 212, 0) }
-    private val brightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.MONOSPACE
-        isFakeBoldText = true
-        setShadowLayer(7f, 0f, 0f, Color.argb(90, 166, 208, 138))
-    }
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
-    private val dimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
-    private val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.MONOSPACE
-        isFakeBoldText = true
-    }
-    private val mascotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val mascotDimPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = false }
+    private val selectionPaint = Paint()
+    private val textPaint = Paint().apply { typeface = Typeface.MONOSPACE }
+    private val titlePaint = Paint().apply { typeface = Typeface.MONOSPACE }
+    private val dimPaint = Paint().apply { typeface = Typeface.MONOSPACE }
+    private val badgePaint = Paint().apply { typeface = Typeface.MONOSPACE }
+    private val inversePaint = Paint().apply { typeface = Typeface.MONOSPACE }
+    private val bitmapPaint = Paint().apply { isFilterBitmap = false }
     private val clock = SimpleDateFormat("HH:mm", Locale.getDefault())
     private var paletteName = ""
 
@@ -51,41 +40,25 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
     private var firstVisible = 0
     private var visibleCount = 0
 
-    private val dolphin = arrayOf(
-        "..........##",
-        ".........###",
-        "........####",
-        ".......#####",
-        "......######",
-        ".....#######",
-        "....########",
-        "...#########",
-        "..##########",
-        ".#####..####",
-        "####.....###",
-        "###.......##"
-    )
-
     private fun applyPalette() {
         val name = prefs.getString("lcd_theme", "GREEN") ?: "GREEN"
         if (name == paletteName) return
         paletteName = name
         val palette = FlipperTheme.palette(name)
         bgPaint.color = Color.parseColor(palette.bg)
-        gridPaint.color = Color.parseColor(palette.grid)
         headerPaint.color = Color.parseColor(palette.header)
         linePaint.color = Color.parseColor(palette.dim)
-        brightPaint.color = Color.parseColor(palette.text)
+        selectionPaint.color = Color.parseColor(palette.text)
         textPaint.color = Color.parseColor(palette.text)
+        titlePaint.color = Color.parseColor(palette.text)
         dimPaint.color = Color.parseColor(palette.dim)
-        badgePaint.color = Color.parseColor(palette.accent)
-        mascotPaint.color = Color.parseColor(palette.text)
-        mascotDimPaint.color = Color.parseColor(palette.dim)
+        badgePaint.color = Color.parseColor(palette.text)
+        inversePaint.color = Color.parseColor(palette.bg)
     }
 
     private fun dp(value: Float): Float = value * resources.displayMetrics.density
 
-    private fun baseline(paint: Paint, y: Float): Float = y + paint.textSize * 0.36f
+    private fun baseline(paint: Paint, y: Float): Float = y + paint.textSize * 0.34f
 
     private fun fit(text: String, maxWidth: Float): String {
         if (textPaint.measureText(text) <= maxWidth) return text
@@ -110,45 +83,42 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
         applyPalette()
 
         canvas.drawRect(0f, 0f, w, h, bgPaint)
-        drawMatrix(canvas, w, h)
 
-        val headerH = dp(52f)
-        val footerH = dp(34f)
+        val headerH = dp(26f)
+        val footerH = dp(18f)
         canvas.drawRect(0f, 0f, w, headerH, headerPaint)
         canvas.drawLine(0f, headerH, w, headerH, linePaint)
         canvas.drawLine(0f, h - footerH, w, h - footerH, linePaint)
 
         val screen = console.current()
         val rows = console.rows()
-        val pad = dp(12f)
+        val pad = dp(9f)
 
-        textPaint.textSize = dp(13f)
-        dimPaint.textSize = dp(10f)
-        brightPaint.textSize = dp(17f)
-        badgePaint.textSize = dp(10f)
+        titlePaint.textSize = dp(11f)
+        dimPaint.textSize = dp(8f)
+        badgePaint.textSize = dp(7f)
+        textPaint.textSize = dp(11f)
 
-        val titleWidth = w - dp(84f)
-        canvas.drawText(fit(screen.title, titleWidth), pad, baseline(brightPaint, dp(19f)), brightPaint)
-        val sub = screen.subtitle.ifEmpty { "FLIPPER ZERO // POCKET EDITION" }
-        canvas.drawText(fit(sub, titleWidth), pad, baseline(dimPaint, dp(39f)), dimPaint)
-        dimPaint.textSize = dp(10f)
+        val titleWidth = w - dp(116f)
+        canvas.drawText(fit(screen.title, titleWidth), pad, baseline(titlePaint, dp(10f)), titlePaint)
+        val sub = screen.subtitle.ifEmpty { "FLIPPER ZERO POCKET" }
+        canvas.drawText(fit(sub, titleWidth), pad, baseline(dimPaint, dp(20f)), dimPaint)
         drawStatusIcons(canvas, w)
-        drawMascot(canvas, w - dp(48f), dp(26f), dp(2.1f))
 
-        var top = headerH + dp(10f)
-        val bottom = h - footerH - dp(8f)
+        var top = headerH + dp(5f)
+        val bottom = h - footerH - dp(4f)
         val picture = screen.bitmap
         if (picture != null && !picture.isRecycled) {
-            val maxBitmapH = min((bottom - top) * 0.68f, dp(250f))
+            val maxBitmapH = min((bottom - top) * 0.72f, dp(220f))
             val scale = min((w - pad * 2) / picture.width.toFloat(), maxBitmapH / picture.height.toFloat())
             val bw = picture.width * scale
             val bh = picture.height * scale
             val dst = RectF((w - bw) / 2f, top, (w + bw) / 2f, top + bh)
             canvas.drawBitmap(picture, null, dst, bitmapPaint)
-            top = dst.bottom + dp(8f)
+            top = dst.bottom + dp(5f)
         }
 
-        rowHeight = dp(if (picture != null) 21f else 29f)
+        rowHeight = dp(if (picture != null) 15f else 21f)
         visibleCount = maxOf(0, floor((bottom - top) / rowHeight).toInt())
         if (console.selection >= rows.size) console.resetSelection()
         if (console.selection < console.scroll) console.scroll = console.selection
@@ -159,9 +129,11 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
         firstVisible = console.scroll
         rowTop = top
 
-        textPaint.textSize = dp(if (picture != null) 11f else 13f)
-        brightPaint.textSize = dp(if (picture != null) 12f else 14f)
-        val valueRight = w - dp(10f)
+        textPaint.textSize = dp(if (picture != null) 9f else 11f)
+        titlePaint.textSize = dp(if (picture != null) 10f else 11f)
+        inversePaint.textSize = textPaint.textSize
+        badgePaint.textSize = dp(8f)
+        val valueRight = w - dp(7f)
 
         for (i in 0 until visibleCount) {
             val index = firstVisible + i
@@ -170,100 +142,60 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
             val y = top + i * rowHeight
             val selected = index == console.selection
             if (selected) {
-                canvas.drawRect(pad - dp(4f), y, w - pad + dp(4f), y + rowHeight - dp(2f), selectedPaint)
+                canvas.drawRect(pad - dp(3f), y, w - pad + dp(3f), y + rowHeight - dp(1f), selectionPaint)
             }
-            val activePaint = if (selected) brightPaint else if (row.enabled) textPaint else dimPaint
-            if (selected) canvas.drawText(">", pad - dp(2f), baseline(activePaint, y + rowHeight * 0.55f), activePaint)
-            val labelX = pad + dp(16f)
-            val rightReserve = if (row.value.isNotEmpty() || row.badge.isNotEmpty()) dp(110f) else dp(4f)
-            canvas.drawText(
-                fit(row.label, w - labelX - rightReserve),
-                labelX,
-                baseline(activePaint, y + rowHeight * 0.55f),
-                activePaint,
-            )
+            val activePaint = if (selected) inversePaint else if (row.enabled) textPaint else dimPaint
+            val labelX = pad + dp(3f)
+            val rightReserve = when {
+                row.value.isNotEmpty() && row.badge.isNotEmpty() -> dp(112f)
+                row.value.isNotEmpty() || row.badge.isNotEmpty() -> dp(66f)
+                else -> dp(4f)
+            }
+            val lineY = baseline(activePaint, y + rowHeight * 0.62f)
+            canvas.drawText(fit(row.label, w - labelX - rightReserve), labelX, lineY, activePaint)
             var valueX = valueRight
             if (row.badge.isNotEmpty()) {
-                canvas.drawText(fit(row.badge, dp(54f)), valueX - textPaint.measureText(row.badge), baseline(badgePaint, y + rowHeight * 0.55f), badgePaint)
-                valueX -= dp(62f)
+                val badge = fit(row.badge, dp(42f))
+                canvas.drawText(badge, valueX - badgePaint.measureText(badge), lineY, if (selected) inversePaint else badgePaint)
+                valueX -= dp(46f)
             }
             if (row.value.isNotEmpty()) {
-                val value = fit(row.value, dp(86f))
-                canvas.drawText(value, valueX - textPaint.measureText(value), baseline(activePaint, y + rowHeight * 0.55f), activePaint)
+                val value = fit(row.value, dp(58f))
+                canvas.drawText(value, valueX - activePaint.measureText(value), lineY, activePaint)
             }
         }
 
         if (rows.isEmpty() && picture == null) {
-            dimPaint.textSize = dp(12f)
-            canvas.drawText("НЕТ ДАННЫХ", w / 2f - textPaint.measureText("НЕТ ДАННЫХ") / 2f, top + dp(24f), dimPaint)
+            dimPaint.textSize = dp(10f)
+            canvas.drawText("НЕТ ДАННЫХ", w / 2f - dimPaint.measureText("НЕТ ДАННЫХ") / 2f, top + dp(18f), dimPaint)
         }
 
-        dimPaint.textSize = dp(9f)
-        val progress = if (rows.isEmpty()) "00/00" else "${console.selection + 1}/${rows.size}".padStart(5, '0')
-        val footerText = "${screen.footer}  [$progress]"
-        canvas.drawText(fit(footerText, w - pad * 2), w / 2f - min(textPaint.measureText(footerText), w - pad * 2) / 2f, h - dp(11f), dimPaint)
-    }
-
-    private fun drawMatrix(canvas: Canvas, w: Float, h: Float) {
-        val step = dp(13f)
-        var x = step
-        while (x < w) {
-            canvas.drawLine(x, 0f, x, h, gridPaint)
-            x += step
-        }
-        var y = step
-        while (y < h) {
-            canvas.drawLine(0f, y, w, y, gridPaint)
-            y += step
-        }
-        y = dp(3f)
-        while (y < h) {
-            canvas.drawLine(0f, y, w, y, scanPaint)
-            y += dp(4f)
-        }
+        dimPaint.textSize = dp(8f)
+        val footerText = fit(screen.footer, w - pad * 2)
+        canvas.drawText(footerText, (w - dimPaint.measureText(footerText)) / 2f, h - dp(5f), dimPaint)
     }
 
     private fun drawStatusIcons(canvas: Canvas, w: Float) {
-        val y = dp(12f)
-        dimPaint.textSize = dp(9f)
-        canvas.drawText(clock.format(Date()), w - dp(112f), baseline(dimPaint, y), dimPaint)
+        val y = dp(9f)
+        dimPaint.textSize = dp(7f)
+        badgePaint.textSize = dp(7f)
+        canvas.drawText(clock.format(Date()), w - dp(98f), baseline(dimPaint, y), dimPaint)
+        canvas.drawText("SD", w - dp(68f), baseline(badgePaint, y), badgePaint)
+        canvas.drawText("BT", w - dp(48f), baseline(badgePaint, y), badgePaint)
+        drawBattery(canvas, w - dp(30f), y - dp(6f), dp(20f), dp(9f))
+        textPaint.textSize = dp(8f)
         badgePaint.textSize = dp(8f)
-        canvas.drawText("SD", w - dp(86f), baseline(badgePaint, y), badgePaint)
-        canvas.drawText("B", w - dp(62f), baseline(badgePaint, y), badgePaint)
-        drawBattery(canvas, w - dp(36f), y - dp(8f), dp(24f), dp(11f))
-        dimPaint.textSize = dp(10f)
-        badgePaint.textSize = dp(10f)
     }
 
     private fun drawBattery(canvas: Canvas, x: Float, y: Float, w: Float, h: Float) {
-        val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor(FlipperTheme.YELLOW)
+        val stroke = Paint().apply {
+            color = Color.parseColor(FlipperTheme.palette(paletteName).text)
             style = Paint.Style.STROKE
             strokeWidth = dp(1f)
         }
         canvas.drawRect(x, y, x + w, y + h, stroke)
-        canvas.drawRect(x + w, y + h * 0.25f, x + w + dp(2f), y + h * 0.75f, stroke)
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor(FlipperTheme.YELLOW) }
-        canvas.drawRect(x + dp(2f), y + dp(2f), x + w * 0.72f, y + h - dp(2f), fill)
-    }
-
-    private fun drawMascot(canvas: Canvas, x: Float, y: Float, px: Float) {
-        for (r in dolphin.indices) {
-            val line = dolphin[r]
-            for (c in line.indices) {
-                if (line[c] == '.') continue
-                val paint = if (line[c] == '#') mascotPaint else mascotDimPaint
-                val left = x + c * px
-                val top = y + r * px
-                canvas.drawRect(left, top, left + px * 0.86f, top + px * 0.86f, paint)
-            }
-        }
-        val eyeX = x + 9 * px
-        val eyeY = y + 3 * px
-        if (SystemClock.uptimeMillis() % 3600L < 140L) {
-            canvas.drawLine(eyeX, eyeY + px * 0.2f, eyeX + px * 0.45f, eyeY + px * 0.2f, mascotPaint)
-        } else {
-            canvas.drawRect(eyeX, eyeY, eyeX + px * 0.35f, eyeY + px * 0.35f, bgPaint)
-        }
+        canvas.drawRect(x + w, y + h * 0.25f, x + w + dp(1.5f), y + h * 0.75f, stroke)
+        val fill = Paint().apply { color = Color.parseColor(FlipperTheme.palette(paletteName).text) }
+        canvas.drawRect(x + dp(1.5f), y + dp(1.5f), x + w * 0.72f, y + h - dp(1.5f), fill)
     }
 }

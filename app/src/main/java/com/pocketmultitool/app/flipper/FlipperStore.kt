@@ -2,128 +2,8 @@ package com.pocketmultitool.app.flipper
 
 import android.content.Context
 import com.pocketmultitool.app.core.JsonStore
-import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class FlipperStore(context: Context) : JsonStore(context, "flipper_zero_store") {
-    private val stamp = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
-
-    fun signals(): List<FlipperSignal> {
-        val array = readArray("subghz")
-        val result = mutableListOf<FlipperSignal>()
-        for (i in 0 until array.length()) {
-            val obj = array.optJSONObject(i) ?: continue
-            result.add(
-                FlipperSignal(
-                    obj.optString("name", ""),
-                    obj.optString("frequency", ""),
-                    obj.optString("protocol", ""),
-                    obj.optString("data", ""),
-                    obj.optString("time", ""),
-                )
-            )
-        }
-        return result
-    }
-
-    fun saveSignal(name: String, frequency: String, protocol: String, data: String) {
-        val obj = JSONObject()
-            .put("name", name)
-            .put("frequency", frequency)
-            .put("protocol", protocol)
-            .put("data", data)
-            .put("time", stamp.format(Date()))
-        replace("subghz", name, "name", obj)
-        addXp(5)
-    }
-
-    fun removeSignal(name: String) = removeAt("subghz", name, "name")
-
-    fun rfidCards(): List<FlipperRfidCard> {
-        val array = readArray("rfid")
-        val result = mutableListOf<FlipperRfidCard>()
-        for (i in 0 until array.length()) {
-            val obj = array.optJSONObject(i) ?: continue
-            result.add(
-                FlipperRfidCard(
-                    obj.optString("name", ""),
-                    obj.optString("uid", ""),
-                    obj.optString("type", ""),
-                    obj.optString("time", ""),
-                )
-            )
-        }
-        return result
-    }
-
-    fun saveRfidCard(name: String, uid: String, type: String) {
-        val obj = JSONObject()
-            .put("name", name)
-            .put("uid", uid)
-            .put("type", type)
-            .put("time", stamp.format(Date()))
-        replace("rfid", name, "name", obj)
-        addXp(5)
-    }
-
-    fun removeRfidCard(name: String) = removeAt("rfid", name, "name")
-
-    fun ibuttons(): List<FlipperIButton> {
-        val array = readArray("ibutton")
-        val result = mutableListOf<FlipperIButton>()
-        for (i in 0 until array.length()) {
-            val obj = array.optJSONObject(i) ?: continue
-            result.add(
-                FlipperIButton(
-                    obj.optString("name", ""),
-                    obj.optString("rom", ""),
-                    obj.optString("time", ""),
-                )
-            )
-        }
-        return result
-    }
-
-    fun saveIButton(name: String, rom: String) {
-        val obj = JSONObject()
-            .put("name", name)
-            .put("rom", rom)
-            .put("time", stamp.format(Date()))
-        replace("ibutton", name, "name", obj)
-        addXp(5)
-    }
-
-    fun removeIButton(name: String) = removeAt("ibutton", name, "name")
-
-    fun scripts(): List<FlipperScript> {
-        val array = readArray("badusb")
-        val result = mutableListOf<FlipperScript>()
-        for (i in 0 until array.length()) {
-            val obj = array.optJSONObject(i) ?: continue
-            result.add(
-                FlipperScript(
-                    obj.optString("name", ""),
-                    obj.optString("body", ""),
-                    obj.optString("time", ""),
-                )
-            )
-        }
-        return result
-    }
-
-    fun saveScript(name: String, body: String) {
-        val obj = JSONObject()
-            .put("name", name)
-            .put("body", body)
-            .put("time", stamp.format(Date()))
-        replace("badusb", name, "name", obj)
-        addXp(5)
-    }
-
-    fun removeScript(name: String) = removeAt("badusb", name, "name")
-
     fun xp(): Int = prefs.getInt("xp", 0)
 
     fun level(): Int = 1 + xp() / 100
@@ -171,10 +51,4 @@ class FlipperStore(context: Context) : JsonStore(context, "flipper_zero_store") 
     }
 
     fun clearNotifications() = writeArray("notifications", org.json.JSONArray())
-
-    fun totalRecords(): Int = signals().size + rfidCards().size + ibuttons().size + scripts().size
-
-    fun clearAll() {
-        listOf("subghz", "rfid", "ibutton", "badusb", "notifications").forEach { writeArray(it, org.json.JSONArray()) }
-    }
 }

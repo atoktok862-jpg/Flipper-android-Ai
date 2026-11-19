@@ -27,6 +27,7 @@ import android.view.GestureDetector
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.Toast
 import com.pocketmultitool.app.core.BitmapScreen
@@ -40,7 +41,6 @@ import com.pocketmultitool.app.flipper.FlipperDeps
 import com.pocketmultitool.app.flipper.FlipperScreens
 import com.pocketmultitool.app.flipper.FlipperStore
 import com.pocketmultitool.app.flipper.FlipperTheme
-import com.pocketmultitool.app.flipper.MomentumScreens
 import com.pocketmultitool.app.hardware.Capabilities
 import com.pocketmultitool.app.hardware.cards.BarcodeFactory
 import com.pocketmultitool.app.hardware.cards.CardStorage
@@ -56,6 +56,7 @@ import com.pocketmultitool.app.hardware.tools.TorchMorse
 import com.pocketmultitool.app.hardware.usb.UsbTerminal
 import com.pocketmultitool.app.ui.RetroDisplayView
 import kotlin.math.abs
+import kotlin.math.min
 
 class MainActivity : Activity(), ConsoleHost {
 
@@ -79,7 +80,6 @@ class MainActivity : Activity(), ConsoleHost {
     private lateinit var console: RetroConsole
     private lateinit var flipperStore: FlipperStore
     private lateinit var flipperScreens: FlipperScreens
-    private lateinit var momentumScreens: MomentumScreens
     private var vibrator: Vibrator? = null
     private lateinit var ir: IrRemote
     private lateinit var nfc: NfcController
@@ -122,12 +122,6 @@ class MainActivity : Activity(), ConsoleHost {
             }
         }
 
-        momentumScreens = MomentumScreens(
-            store = flipperStore,
-            openNfc = { nfcScreen() },
-            openUsb = { usbScreen() },
-            openScanner = { scannerScreen() },
-        )
         flipperScreens = FlipperScreens(
             context = this,
             store = flipperStore,
@@ -142,7 +136,6 @@ class MainActivity : Activity(), ConsoleHost {
                 about = { aboutScreen() },
                 tagCount = { tagStorage.all().size },
                 cardCount = { cards.all().size },
-                momentum = { momentumScreens.momentumScreen() },
             ),
         )
         console = RetroConsole(this, flipperScreens.mainScreen())
@@ -151,36 +144,74 @@ class MainActivity : Activity(), ConsoleHost {
 
     private fun dp(value: Float): Int = (value * resources.displayMetrics.density).toInt()
 
+    private class LcdFrame(context: Context) : FrameLayout(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val availableWidth = View.MeasureSpec.getSize(widthMeasureSpec)
+            val availableHeight = View.MeasureSpec.getSize(heightMeasureSpec)
+            val horizontalPadding = dp(9f) * 2
+            val verticalPadding = dp(9f) * 2
+            val maxInnerHeight = (availableHeight - verticalPadding).coerceAtLeast(dp(60f))
+            val targetWidth = min(availableWidth, maxInnerHeight * 2 + horizontalPadding).coerceAtLeast(dp(120f))
+            setMeasuredDimension(targetWidth, (targetWidth - horizontalPadding) / 2 + verticalPadding)
+        }
+
+        private fun dp(value: Float): Int = (value * resources.displayMetrics.density).toInt()
+    }
+
+    private fun consoleAction(action: (RetroConsole) -> Unit) {
+        if (!::console.isInitialized) return
+        action(console)
+        display.invalidate()
+    }
+
     private fun buildUi() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
             setBackgroundColor(Color.parseColor(FlipperTheme.SHELL))
         }
-        val frame = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-            setBackgroundResource(R.drawable.bg_screen_frame)
-            setPadding(dp(10f), dp(12f), dp(10f), dp(8f))
+        val bezel = LcdFrame(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                setMargins(dp(14f), dp(18f), dp(14f), dp(10f))
+            }
+            setBackgroundResource(R.drawable.bg_lcd_bezel)
+            setPadding(dp(9f), dp(9f), dp(9f), dp(9f))
             clipToPadding = true
         }
         display = RetroDisplayView(this).apply {
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
             isClickable = true
         }
-        frame.addView(display)
-        root.addView(frame)
+        bezel.addView(display)
+        root.addView(bezel)
 
-        val keys = LinearLayout(this).apply {
+        val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(86f))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
-        keys.addView(makeKey("▲\nВВЕРХ", R.drawable.bg_key, 1f) { if (::console.isInitialized) console.up() })
-        keys.addView(makeKey("▼\nВНИЗ", R.drawable.bg_key, 1f) {
-            if (::console.isInitialized) console.down(console.rows().size)
+        val pad = GridLayout(this).apply {
+            rowCount = 3
+            columnCount = 3
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        addPadKey(pad, "▲", 0, 1, R.drawable.bg_dpad_key, "ВВЕРХ") { consoleAction { it.up() } }
+        addPadKey(pad, "◀", 1, 0, R.drawable.bg_dpad_key, "ПРОКРУТКА ВВЕРХ") { consoleAction { it.up() } }
+        addPadKey(pad, "OK", 1, 1, R.drawable.bg_dpad_center, "OK") { consoleAction { it.ok() } }
+        addPadKey(pad, "▶", 1, 2, R.drawable.bg_dpad_key, "ПРОКРУТКА ВНИЗ") {
+            consoleAction { it.down(it.rows().size) }
+        }
+        addPadKey(pad, "▼", 2, 1, R.drawable.bg_dpad_key, "ВНИЗ") {
+            consoleAction { it.down(it.rows().size) }
+        }
+        controls.addView(pad)
+        controls.addView(View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(26f), 1)
         })
-        keys.addView(makeKey("OK\nВЫБОР", R.drawable.bg_key_ok, 1.15f) { if (::console.isInitialized) console.ok() })
-        keys.addView(makeKey("◀\nНАЗАД", R.drawable.bg_key_back, 1f) { if (::console.isInitialized) console.back() })
-        root.addView(keys)
+        controls.addView(makeRoundKey("◀", "НАЗАД", R.drawable.bg_key_back) {
+            consoleAction { it.back() }
+        })
+        root.addView(controls)
         setContentView(root)
 
         val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
@@ -192,6 +223,7 @@ class MainActivity : Activity(), ConsoleHost {
                 if (index < 0) return false
                 if (index == console.selection) {
                     console.ok()
+                    display.invalidate()
                 } else {
                     console.select(index)
                     display.invalidate()
@@ -210,17 +242,44 @@ class MainActivity : Activity(), ConsoleHost {
         display.setOnTouchListener { _: View?, event: MotionEvent -> detector.onTouchEvent(event) }
     }
 
-    private fun makeKey(label: String, background: Int, weight: Float, action: () -> Unit): Button =
-        Button(this).apply {
+    private fun addPadKey(
+        parent: GridLayout,
+        label: String,
+        row: Int,
+        column: Int,
+        background: Int,
+        description: String,
+        action: () -> Unit,
+    ) {
+        val key = Button(this).apply {
             text = label
+            contentDescription = description
             setBackgroundResource(background)
             setTextColor(Color.parseColor(FlipperTheme.YELLOW))
-            textSize = 14f
+            textSize = 17f
             typeface = Typeface.MONOSPACE
             isAllCaps = false
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight).apply {
-                setMargins(dp(5f), dp(9f), dp(5f), dp(12f))
+            includeFontPadding = false
+            layoutParams = GridLayout.LayoutParams(GridLayout.spec(row), GridLayout.spec(column)).apply {
+                width = dp(48f)
+                height = dp(48f)
             }
+            setOnClickListener { action() }
+        }
+        parent.addView(key)
+    }
+
+    private fun makeRoundKey(label: String, description: String, background: Int, action: () -> Unit): Button =
+        Button(this).apply {
+            text = label
+            contentDescription = description
+            setBackgroundResource(background)
+            setTextColor(Color.parseColor(FlipperTheme.YELLOW))
+            textSize = 20f
+            typeface = Typeface.MONOSPACE
+            isAllCaps = false
+            includeFontPadding = false
+            layoutParams = LinearLayout.LayoutParams(dp(62f), dp(62f))
             setOnClickListener { action() }
         }
 
@@ -248,7 +307,11 @@ class MainActivity : Activity(), ConsoleHost {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        if (!::console.isInitialized || !console.back()) super.onBackPressed()
+        if (::console.isInitialized && console.back()) {
+            display.invalidate()
+        } else {
+            super.onBackPressed()
+        }
     }
 
     @SuppressLint("MissingSuperCall", "DEPRECATION")
@@ -281,10 +344,14 @@ class MainActivity : Activity(), ConsoleHost {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
-    override fun open(screen: ConsoleScreen) = console.open(screen)
+    override fun open(screen: ConsoleScreen) {
+        console.open(screen)
+        display.invalidate()
+    }
 
     override fun back() {
         console.back()
+        display.invalidate()
     }
 
     override fun input(title: String, hint: String, default: String, onResult: (String) -> Unit) {
@@ -293,8 +360,8 @@ class MainActivity : Activity(), ConsoleHost {
             setText(default)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             maxLines = 8
-            setTextColor(Color.parseColor("#FFD08A"))
-            setHintTextColor(Color.parseColor("#7A5218"))
+            setTextColor(Color.parseColor(FlipperTheme.YELLOW))
+            setHintTextColor(Color.parseColor(FlipperTheme.YELLOW_DIM))
         }
         AlertDialog.Builder(this)
             .setTitle(title)
@@ -832,7 +899,7 @@ class MainActivity : Activity(), ConsoleHost {
 
     private fun statusScreen(): TextScreen = TextScreen(
         title = "ДИАГНОСТИКА",
-        subtitle = "FLIPPER HARDWARE SCAN",
+        subtitle = "HARDWARE SCAN",
         footer = "OK ОБНОВИТЬ   ◀ НАЗАД",
         refreshMs = 1000L,
         lines = { Capabilities.report(this) },
@@ -842,16 +909,13 @@ class MainActivity : Activity(), ConsoleHost {
         title = "О ПРОГРАММЕ",
         lines = {
             listOf(
-                "FLIPPER ZERO POCKET v1.0",
-                "KOTLIN / ANDROID / MATERIAL-YELLOW",
-                "ЭКРАН: 1.47 INCH LCD STYLE",
-                "РАЗДЕЛЫ: SUB-GHZ, RFID, NFC, IR",
-                "РАЗДЕЛЫ: iBUTTON, BADUSB, BLE, GPIO",
-                "ПРИЛОЖЕНИЯ: ИГРЫ И КАЛЬКУЛЯТОР",
-                "АРХИВ: СИГНАЛЫ, КАРТЫ, КЛЮЧИ, СКРИПТЫ",
-                "ДОЛФИН: XP, УРОВНИ, УВЕДОМЛЕНИЯ",
+                "FLIPPER ZERO POCKET v1.1",
+                "KOTLIN / ANDROID / LCD 128x64 STYLE",
+                "РАЗДЕЛЫ: NFC, IR, СКАНЕРЫ, АРХИВ",
+                "ПРИЛОЖЕНИЯ: ИГРЫ, КАЛЬКУЛЯТОР, MORSE",
                 "ЖЕЛЕЗО: ИК, NFC, BLE, WI-FI, USB, FLASH",
-                "ЧАСТЬ ФУНКЦИЙ ТРЕБУЕТ ВНЕШНИЙ МОДУЛЬ",
+                "ДОЛФИН: XP, УРОВНИ, УВЕДОМЛЕНИЯ",
+                "ТОЛЬКО РАБОЧИЕ ФУНКЦИИ ТЕЛЕФОНА",
             )
         },
     )

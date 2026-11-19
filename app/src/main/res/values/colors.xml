@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="void_bg">#0B120C</color>
-    <color name="lcd_green">#A6D08A</color>
-    <color name="lcd_amber">#FFB347</color>
-    <color name="flipper_yellow">#FFD400</color>
-    <color name="flipper_shell">#242526</color>
-    <color name="flipper_shell_dark">#151617</color>
+    <color name="void_bg">#C8D3BC</color>
+    <color name="lcd_green">#1B241A</color>
+    <color name="lcd_amber">#2B2212</color>
+    <color name="flipper_yellow">#E8EAE4</color>
+    <color name="flipper_shell">#2E3133</color>
+    <color name="flipper_shell_dark">#17191A</color>
 </resources>
