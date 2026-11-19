@@ -40,6 +40,7 @@ import com.pocketmultitool.app.flipper.FlipperDeps
 import com.pocketmultitool.app.flipper.FlipperScreens
 import com.pocketmultitool.app.flipper.FlipperStore
 import com.pocketmultitool.app.flipper.FlipperTheme
+import com.pocketmultitool.app.flipper.MomentumScreens
 import com.pocketmultitool.app.hardware.Capabilities
 import com.pocketmultitool.app.hardware.cards.BarcodeFactory
 import com.pocketmultitool.app.hardware.cards.CardStorage
@@ -78,6 +79,7 @@ class MainActivity : Activity(), ConsoleHost {
     private lateinit var console: RetroConsole
     private lateinit var flipperStore: FlipperStore
     private lateinit var flipperScreens: FlipperScreens
+    private lateinit var momentumScreens: MomentumScreens
     private var vibrator: Vibrator? = null
     private lateinit var ir: IrRemote
     private lateinit var nfc: NfcController
@@ -120,6 +122,12 @@ class MainActivity : Activity(), ConsoleHost {
             }
         }
 
+        momentumScreens = MomentumScreens(
+            store = flipperStore,
+            openNfc = { nfcScreen() },
+            openUsb = { usbScreen() },
+            openScanner = { scannerScreen() },
+        )
         flipperScreens = FlipperScreens(
             context = this,
             store = flipperStore,
@@ -134,6 +142,7 @@ class MainActivity : Activity(), ConsoleHost {
                 about = { aboutScreen() },
                 tagCount = { tagStorage.all().size },
                 cardCount = { cards.all().size },
+                momentum = { momentumScreens.momentumScreen() },
             ),
         )
         console = RetroConsole(this, flipperScreens.mainScreen())

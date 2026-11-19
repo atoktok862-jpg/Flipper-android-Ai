@@ -22,6 +22,7 @@ data class FlipperDeps(
     val about: () -> TextScreen,
     val tagCount: () -> Int,
     val cardCount: () -> Int,
+    val momentum: () -> MenuScreen,
 )
 
 class FlipperScreens(
@@ -47,7 +48,8 @@ class FlipperScreens(
             MenuItem("12  ДОЛФИН", badge = "LVL ${store.level()}") { h -> h.open(dolphinScreen()) },
             MenuItem("13  НАСТРОЙКИ") { h -> h.open(settingsScreen()) },
             MenuItem("14  ДИАГНОСТИКА") { h -> h.open(deps.status()) },
-            MenuItem("15  О ПРОГРАММЕ") { h -> h.open(deps.about()) },
+            MenuItem("15  MOMENTUM / CFW", badge = "MNTM") { h -> h.open(deps.momentum()) },
+            MenuItem("16  О ПРОГРАММЕ") { h -> h.open(deps.about()) },
         ),
     )
 
