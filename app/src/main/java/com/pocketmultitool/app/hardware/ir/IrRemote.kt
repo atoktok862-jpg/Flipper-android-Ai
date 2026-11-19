@@ -25,23 +25,29 @@ class IrRemote(context: Context) {
             "неизвестно"
         }
 
-    fun carrier(requested: Int): Int = try {
-        val ranges = manager?.carrierFrequencies
-        if (ranges.isNullOrEmpty()) {
-            requested
-        } else {
-            val exact = ranges.firstOrNull { requested in it.minFrequency..it.maxFrequency }
-            if (exact != null) {
+    fun carrier(requested: Int): Int {
+        return try {
+            val ranges = manager?.carrierFrequencies
+            if (ranges.isNullOrEmpty()) {
                 requested
             } else {
-                val closest = ranges.minByOrNull {
-                    min(abs(requested - it.minFrequency), abs(requested - it.maxFrequency))
-                } ?: return requested
-                min(max(requested, closest.minFrequency), closest.maxFrequency)
+                val exact = ranges.firstOrNull { requested in it.minFrequency..it.maxFrequency }
+                if (exact != null) {
+                    requested
+                } else {
+                    val closest = ranges.minByOrNull {
+                        min(abs(requested - it.minFrequency), abs(requested - it.maxFrequency))
+                    }
+                    if (closest == null) {
+                        requested
+                    } else {
+                        min(max(requested, closest.minFrequency), closest.maxFrequency)
+                    }
+                }
             }
+        } catch (_: Exception) {
+            requested
         }
-    } catch (_: Exception) {
-        requested
     }
 
     fun sendNec(code: Long): String = transmit(carrier(38000), IrDatabase.necPattern(code))

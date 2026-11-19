@@ -21,6 +21,7 @@ class UsbTerminal(context: Context, private val onLog: (String) -> Unit) {
     private val manager: UsbManager? = app.getSystemService(Context.USB_SERVICE) as? UsbManager
     private val permissionAction = "${app.packageName}.USB_PERMISSION"
     private var receiverRegistered = false
+    private var permissionReceiver: BroadcastReceiver? = null
 
     var selectedDevice: UsbDevice? = null
     var baud: Int = 115200
@@ -36,13 +37,34 @@ class UsbTerminal(context: Context, private val onLog: (String) -> Unit) {
     val isOpen: Boolean get() = connection != null
 
     init {
-        val filter = IntentFilter(permissionAction)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            app.registerReceiver(permissionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            app.registerReceiver(permissionReceiver, filter)
+        permissionReceiver = object : BroadcastReceiver() {
+            @Suppress("DEPRECATION")
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action != permissionAction) return
+                val device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) as? UsbDevice
+                val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                if (device == null) {
+                    onLog("ОШИБКА: устройство не получено")
+                    return
+                }
+                if (granted) {
+                    selectedDevice = device
+                    onLog("РАЗРЕШЕНИЕ ПОЛУЧЕНО: ${describe(device)}")
+                    onLog(open())
+                } else {
+                    onLog("ОТКАЗ В РАЗРЕШЕНИИ USB")
+                }
+            }
         }
-        receiverRegistered = true
+        val filter = IntentFilter(permissionAction)
+        permissionReceiver?.let { receiver ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                app.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                app.registerReceiver(receiver, filter)
+            }
+            receiverRegistered = true
+        }
     }
 
     fun devices(): List<UsbDevice> = manager?.deviceList?.values?.toList() ?: emptyList()
@@ -151,9 +173,12 @@ class UsbTerminal(context: Context, private val onLog: (String) -> Unit) {
     fun destroy() {
         close()
         if (receiverRegistered) {
-            try { app.unregisterReceiver(permissionReceiver) } catch (_: Exception) {}
+            permissionReceiver?.let { receiver ->
+                try { app.unregisterReceiver(receiver) } catch (_: Exception) {}
+            }
             receiverRegistered = false
         }
+        permissionReceiver = null
     }
 
     private fun findInterface(device: UsbDevice): UsbInterface? {
@@ -170,28 +195,8 @@ class UsbTerminal(context: Context, private val onLog: (String) -> Unit) {
             .put(0.toByte())
             .put(8.toByte())
             .array()
-        val requestType = UsbConstants.USB_TYPE_CLASS or UsbConstants.USB_DIR_OUT or UsbConstants.USB_RECIP_INTERFACE
+        val requestType = UsbConstants.USB_TYPE_CLASS or UsbConstants.USB_DIR_OUT or 0x01
         val written = conn.controlTransfer(requestType, 0x20, 0, interfaceId, payload, payload.size, 1000)
         return if (written >= 0) "OK ($speed)" else "НЕ ПОДДЕРЖИВАЕТСЯ ($written)"
-    }
-
-    private val permissionReceiver = object : BroadcastReceiver() {
-        @Suppress("DEPRECATION")
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action != permissionAction) return
-            val device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE) as? UsbDevice
-            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-            if (device == null) {
-                onLog("ОШИБКА: устройство не получено")
-                return
-            }
-            if (granted) {
-                selectedDevice = device
-                onLog("РАЗРЕШЕНИЕ ПОЛУЧЕНО: ${describe(device)}")
-                onLog(open())
-            } else {
-                onLog("ОТКАЗ В РАЗРЕШЕНИИ USB")
-            }
-        }
     }
 }

@@ -167,8 +167,8 @@ class MainActivity : Activity(), ConsoleHost {
                 return true
             }
 
-            override fun onFling(e1: MotionEvent?, e2: MotionEvent?, velocityX: Float, velocityY: Float): Boolean {
-                if (!::console.isInitialized || e1 == null || e2 == null) return false
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (!::console.isInitialized) return false
                 if (abs(velocityY) < 70f) return false
                 if (velocityY < 0) console.down(console.rows().size) else console.up()
                 display.invalidate()

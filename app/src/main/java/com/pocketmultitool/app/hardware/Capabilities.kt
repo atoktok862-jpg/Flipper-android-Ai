@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.ConsumerIrManager
 import android.os.Build
+import android.os.Vibrator
+import android.os.VibratorManager
 import com.pocketmultitool.app.BuildConfig
 
 object Capabilities {
@@ -31,8 +33,16 @@ object Capabilities {
             "WI-FI: ${yes(pm.hasSystemFeature(PackageManager.FEATURE_WIFI))}",
             "USB HOST: ${yes(pm.hasSystemFeature(PackageManager.FEATURE_USB_HOST))}",
             "КАМЕРА: ${yes(pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY))}",
-            "ВИБРАЦИЯ: ${yes(pm.hasSystemFeature(PackageManager.FEATURE_VIBRATOR))}",
+            "ВИБРАЦИЯ: ${yes(hasVibrator(context))}",
         )
+    }
+
+    private fun hasVibrator(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            if (manager != null) return manager.defaultVibrator.hasVibrator()
+        }
+        return (context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)?.hasVibrator() == true
     }
 
     private fun yes(value: Boolean) = if (value) "ЕСТЬ" else "НЕТ"
