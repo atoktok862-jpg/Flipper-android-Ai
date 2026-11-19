@@ -36,6 +36,10 @@ import com.pocketmultitool.app.core.MenuItem
 import com.pocketmultitool.app.core.MenuScreen
 import com.pocketmultitool.app.core.RetroConsole
 import com.pocketmultitool.app.core.TextScreen
+import com.pocketmultitool.app.flipper.FlipperDeps
+import com.pocketmultitool.app.flipper.FlipperScreens
+import com.pocketmultitool.app.flipper.FlipperStore
+import com.pocketmultitool.app.flipper.FlipperTheme
 import com.pocketmultitool.app.hardware.Capabilities
 import com.pocketmultitool.app.hardware.cards.BarcodeFactory
 import com.pocketmultitool.app.hardware.cards.CardStorage
@@ -72,6 +76,8 @@ class MainActivity : Activity(), ConsoleHost {
 
     private lateinit var display: RetroDisplayView
     private lateinit var console: RetroConsole
+    private lateinit var flipperStore: FlipperStore
+    private lateinit var flipperScreens: FlipperScreens
     private var vibrator: Vibrator? = null
     private lateinit var ir: IrRemote
     private lateinit var nfc: NfcController
@@ -92,6 +98,7 @@ class MainActivity : Activity(), ConsoleHost {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        flipperStore = FlipperStore(this)
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         buildUi()
 
@@ -113,7 +120,23 @@ class MainActivity : Activity(), ConsoleHost {
             }
         }
 
-        console = RetroConsole(this, mainScreen())
+        flipperScreens = FlipperScreens(
+            context = this,
+            store = flipperStore,
+            deps = FlipperDeps(
+                ir = { irScreen() },
+                nfc = { nfcScreen() },
+                cards = { cardsScreen() },
+                scanner = { scannerScreen() },
+                usb = { usbScreen() },
+                tools = { toolsScreen() },
+                status = { statusScreen() },
+                about = { aboutScreen() },
+                tagCount = { tagStorage.all().size },
+                cardCount = { cards.all().size },
+            ),
+        )
+        console = RetroConsole(this, flipperScreens.mainScreen())
         display.console = console
     }
 
@@ -122,7 +145,7 @@ class MainActivity : Activity(), ConsoleHost {
     private fun buildUi() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0B0905"))
+            setBackgroundColor(Color.parseColor(FlipperTheme.SHELL))
         }
         val frame = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
@@ -146,7 +169,7 @@ class MainActivity : Activity(), ConsoleHost {
         keys.addView(makeKey("▼\nВНИЗ", R.drawable.bg_key, 1f) {
             if (::console.isInitialized) console.down(console.rows().size)
         })
-        keys.addView(makeKey("OK\nВХОД", R.drawable.bg_key_ok, 1.15f) { if (::console.isInitialized) console.ok() })
+        keys.addView(makeKey("OK\nВЫБОР", R.drawable.bg_key_ok, 1.15f) { if (::console.isInitialized) console.ok() })
         keys.addView(makeKey("◀\nНАЗАД", R.drawable.bg_key_back, 1f) { if (::console.isInitialized) console.back() })
         root.addView(keys)
         setContentView(root)
@@ -182,7 +205,7 @@ class MainActivity : Activity(), ConsoleHost {
         Button(this).apply {
             text = label
             setBackgroundResource(background)
-            setTextColor(Color.parseColor("#FFD08A"))
+            setTextColor(Color.parseColor(FlipperTheme.YELLOW))
             textSize = 14f
             typeface = Typeface.MONOSPACE
             isAllCaps = false
@@ -259,7 +282,8 @@ class MainActivity : Activity(), ConsoleHost {
         val field = EditText(this).apply {
             this.hint = hint
             setText(default)
-            inputType = InputType.TYPE_CLASS_TEXT
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            maxLines = 8
             setTextColor(Color.parseColor("#FFD08A"))
             setHintTextColor(Color.parseColor("#7A5218"))
         }
@@ -290,6 +314,7 @@ class MainActivity : Activity(), ConsoleHost {
 
     @Suppress("DEPRECATION")
     override fun vibrate(ms: Long) {
+        if (::flipperStore.isInitialized && !flipperStore.flag("vibration", true)) return
         vibrator?.let { if (it.hasVibrator()) it.vibrate(ms) }
     }
 
@@ -322,21 +347,6 @@ class MainActivity : Activity(), ConsoleHost {
         }
         previousBrightness = null
     }
-
-    private fun mainScreen(): MenuScreen = MenuScreen(
-        title = "POCKET MULTITOOL",
-        subtitle = "РЕТРО-КОНСОЛЬ // REDMI 12 EDITION",
-        items = listOf(
-            MenuItem("01  ИК-ПУЛЬТ", badge = if (ir.available) "ГОТОВ" else "НЕТ") { h -> h.open(irScreen()) },
-            MenuItem("02  NFC МЕНЕДЖЕР", badge = if (nfc.available) "ГОТОВ" else "НЕТ") { h -> h.open(nfcScreen()) },
-            MenuItem("03  КАРТЫ И КОДЫ", badge = "ZXING") { h -> h.open(cardsScreen()) },
-            MenuItem("04  РАДИО-СКАНЕР", badge = "BLE/WI-FI") { h -> h.open(scannerScreen()) },
-            MenuItem("05  USB-OTG ТЕРМИНАЛ", badge = if (usb.available) "HOST" else "НЕТ") { h -> h.open(usbScreen()) },
-            MenuItem("06  ИНСТРУМЕНТЫ", badge = "AU/TORCH") { h -> h.open(toolsScreen()) },
-            MenuItem("07  ДИАГНОСТИКА") { h -> h.open(statusScreen()) },
-            MenuItem("08  О ПРОГРАММЕ") { h -> h.open(aboutScreen()) },
-        ),
-    )
 
     private fun irScreen(): MenuScreen = MenuScreen(
         title = "ИК-ПУЛЬТ",
@@ -813,7 +823,7 @@ class MainActivity : Activity(), ConsoleHost {
 
     private fun statusScreen(): TextScreen = TextScreen(
         title = "ДИАГНОСТИКА",
-        subtitle = "ПРОВЕРКА ОБОРУДОВАНИЯ",
+        subtitle = "FLIPPER HARDWARE SCAN",
         footer = "OK ОБНОВИТЬ   ◀ НАЗАД",
         refreshMs = 1000L,
         lines = { Capabilities.report(this) },
@@ -823,17 +833,16 @@ class MainActivity : Activity(), ConsoleHost {
         title = "О ПРОГРАММЕ",
         lines = {
             listOf(
-                "POCKET MULTITOOL v1.0",
-                "KOTLIN / ANDROID 13-14",
-                "ЦЕЛЕВОЕ УСТРОЙСТВО: REDMI 12",
-                "ИК: ВСТРОЕННАЯ БАЗА NEC + RAW",
-                "NFC: ЧТЕНИЕ И ЗАПИСЬ NDEF",
-                "КАРТЫ: QR, EAN-13, CODE-128",
-                "СКАНЕР: BLE + WI-FI",
-                "USB: CDC-ACM BULK TERMINAL",
-                "ЗВУК: AudioTrack 20-20000 Гц",
-                "МОРЗЕ: КАМЕРНЫЙ ФОНАРИК",
-                "РЕТРО-МАСКОТ: КИБЕР-ЛИС",
+                "FLIPPER ZERO POCKET v1.0",
+                "KOTLIN / ANDROID / MATERIAL-YELLOW",
+                "ЭКРАН: 1.47 INCH LCD STYLE",
+                "РАЗДЕЛЫ: SUB-GHZ, RFID, NFC, IR",
+                "РАЗДЕЛЫ: iBUTTON, BADUSB, BLE, GPIO",
+                "ПРИЛОЖЕНИЯ: ИГРЫ И КАЛЬКУЛЯТОР",
+                "АРХИВ: СИГНАЛЫ, КАРТЫ, КЛЮЧИ, СКРИПТЫ",
+                "ДОЛФИН: XP, УРОВНИ, УВЕДОМЛЕНИЯ",
+                "ЖЕЛЕЗО: ИК, NFC, BLE, WI-FI, USB, FLASH",
+                "ЧАСТЬ ФУНКЦИЙ ТРЕБУЕТ ВНЕШНИЙ МОДУЛЬ",
             )
         },
     )

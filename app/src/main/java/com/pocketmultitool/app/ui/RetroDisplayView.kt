@@ -1,6 +1,7 @@
 package com.pocketmultitool.app.ui
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -9,6 +10,7 @@ import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.View
 import com.pocketmultitool.app.core.RetroConsole
+import com.pocketmultitool.app.flipper.FlipperTheme
 import java.util.Date
 import java.util.Locale
 import java.text.SimpleDateFormat
@@ -20,53 +22,66 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
 
     lateinit var console: RetroConsole
 
-    private val bgPaint = Paint().apply { color = Color.parseColor("#0B0905") }
-    private val gridPaint = Paint().apply { color = Color.argb(18, 255, 179, 71) }
-    private val scanPaint = Paint().apply { color = Color.argb(12, 0, 0, 0) }
-    private val headerPaint = Paint().apply { color = Color.parseColor("#1B1206") }
-    private val linePaint = Paint().apply { color = Color.parseColor("#5C3E12") }
-    private val selectedPaint = Paint().apply { color = Color.argb(46, 255, 179, 71) }
+    private val prefs: SharedPreferences = context.applicationContext.getSharedPreferences("flipper_zero_store", Context.MODE_PRIVATE)
+    private val bgPaint = Paint()
+    private val gridPaint = Paint()
+    private val scanPaint = Paint().apply { color = Color.argb(18, 0, 0, 0) }
+    private val headerPaint = Paint()
+    private val linePaint = Paint()
+    private val selectedPaint = Paint().apply { color = Color.argb(46, 255, 212, 0) }
     private val brightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#FFD08A")
         typeface = Typeface.MONOSPACE
         isFakeBoldText = true
-        setShadowLayer(7f, 0f, 0f, Color.argb(110, 255, 150, 40))
+        setShadowLayer(7f, 0f, 0f, Color.argb(90, 166, 208, 138))
     }
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#FFB347")
-        typeface = Typeface.MONOSPACE
-    }
-    private val dimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#7A5218")
-        typeface = Typeface.MONOSPACE
-    }
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
+    private val dimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
     private val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#FFE2B0")
         typeface = Typeface.MONOSPACE
         isFakeBoldText = true
     }
+    private val mascotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val mascotDimPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = false }
     private val clock = SimpleDateFormat("HH:mm", Locale.getDefault())
+    private var paletteName = ""
 
     private var rowTop = 0f
     private var rowHeight = 0f
     private var firstVisible = 0
     private var visibleCount = 0
 
-    private val fox = arrayOf(
-        "..##....##..",
-        ".####..####.",
-        "############",
-        "###..##..###",
-        "############",
-        "++########++",
-        ".++######++.",
-        "..++####++..",
-        "...++++++...",
-        "....++++....",
-        "...+....+...",
-        "............"
+    private val dolphin = arrayOf(
+        "..........##",
+        ".........###",
+        "........####",
+        ".......#####",
+        "......######",
+        ".....#######",
+        "....########",
+        "...#########",
+        "..##########",
+        ".#####..####",
+        "####.....###",
+        "###.......##"
     )
+
+    private fun applyPalette() {
+        val name = prefs.getString("lcd_theme", "GREEN") ?: "GREEN"
+        if (name == paletteName) return
+        paletteName = name
+        val palette = FlipperTheme.palette(name)
+        bgPaint.color = Color.parseColor(palette.bg)
+        gridPaint.color = Color.parseColor(palette.grid)
+        headerPaint.color = Color.parseColor(palette.header)
+        linePaint.color = Color.parseColor(palette.dim)
+        brightPaint.color = Color.parseColor(palette.text)
+        textPaint.color = Color.parseColor(palette.text)
+        dimPaint.color = Color.parseColor(palette.dim)
+        badgePaint.color = Color.parseColor(palette.accent)
+        mascotPaint.color = Color.parseColor(palette.text)
+        mascotDimPaint.color = Color.parseColor(palette.dim)
+    }
 
     private fun dp(value: Float): Float = value * resources.displayMetrics.density
 
@@ -92,6 +107,7 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
         val w = width.toFloat()
         val h = height.toFloat()
         if (w <= 0 || h <= 0 || !::console.isInitialized) return
+        applyPalette()
 
         canvas.drawRect(0f, 0f, w, h, bgPaint)
         drawMatrix(canvas, w, h)
@@ -113,11 +129,11 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
 
         val titleWidth = w - dp(84f)
         canvas.drawText(fit(screen.title, titleWidth), pad, baseline(brightPaint, dp(19f)), brightPaint)
-        val sub = screen.subtitle.ifEmpty { "POCKET//MULTITOOL  REDMI EDITION" }
+        val sub = screen.subtitle.ifEmpty { "FLIPPER ZERO // POCKET EDITION" }
         canvas.drawText(fit(sub, titleWidth), pad, baseline(dimPaint, dp(39f)), dimPaint)
         dimPaint.textSize = dp(10f)
-        canvas.drawText(clock.format(Date()), w - dp(56f), baseline(dimPaint, dp(17f)), dimPaint)
-        drawMascot(canvas, w - dp(48f), dp(24f), dp(2.1f))
+        drawStatusIcons(canvas, w)
+        drawMascot(canvas, w - dp(48f), dp(26f), dp(2.1f))
 
         var top = headerH + dp(10f)
         val bottom = h - footerH - dp(8f)
@@ -207,35 +223,47 @@ class RetroDisplayView(context: Context, attrs: AttributeSet? = null) : View(con
         }
     }
 
+    private fun drawStatusIcons(canvas: Canvas, w: Float) {
+        val y = dp(12f)
+        dimPaint.textSize = dp(9f)
+        canvas.drawText(clock.format(Date()), w - dp(112f), baseline(dimPaint, y), dimPaint)
+        badgePaint.textSize = dp(8f)
+        canvas.drawText("SD", w - dp(86f), baseline(badgePaint, y), badgePaint)
+        canvas.drawText("B", w - dp(62f), baseline(badgePaint, y), badgePaint)
+        drawBattery(canvas, w - dp(36f), y - dp(8f), dp(24f), dp(11f))
+        dimPaint.textSize = dp(10f)
+        badgePaint.textSize = dp(10f)
+    }
+
+    private fun drawBattery(canvas: Canvas, x: Float, y: Float, w: Float, h: Float) {
+        val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor(FlipperTheme.YELLOW)
+            style = Paint.Style.STROKE
+            strokeWidth = dp(1f)
+        }
+        canvas.drawRect(x, y, x + w, y + h, stroke)
+        canvas.drawRect(x + w, y + h * 0.25f, x + w + dp(2f), y + h * 0.75f, stroke)
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor(FlipperTheme.YELLOW) }
+        canvas.drawRect(x + dp(2f), y + dp(2f), x + w * 0.72f, y + h - dp(2f), fill)
+    }
+
     private fun drawMascot(canvas: Canvas, x: Float, y: Float, px: Float) {
-        val blink = SystemClock.uptimeMillis() % 3200L < 130L
-        for (r in fox.indices) {
-            val line = fox[r]
+        for (r in dolphin.indices) {
+            val line = dolphin[r]
             for (c in line.indices) {
-                val ch = line[c]
-                if (ch == '.') continue
-                val color = when (ch) {
-                    '#' -> Color.argb(255, 255, 179, 71)
-                    '+' -> Color.argb(190, 122, 82, 24)
-                    else -> continue
-                }
-                val paint = if (ch == '#') brightPaint else dimPaint
-                paint.color = color
+                if (line[c] == '.') continue
+                val paint = if (line[c] == '#') mascotPaint else mascotDimPaint
                 val left = x + c * px
                 val top = y + r * px
                 canvas.drawRect(left, top, left + px * 0.86f, top + px * 0.86f, paint)
             }
         }
-        brightPaint.color = Color.parseColor("#FFD08A")
-        dimPaint.color = Color.parseColor("#7A5218")
-        if (!blink) {
-            brightPaint.color = Color.parseColor("#0B0905")
-            canvas.drawRect(x + 4 * px, y + 3 * px, x + 5 * px, y + 4 * px, brightPaint)
-            canvas.drawRect(x + 7 * px, y + 3 * px, x + 8 * px, y + 4 * px, brightPaint)
-            brightPaint.color = Color.parseColor("#FFD08A")
+        val eyeX = x + 9 * px
+        val eyeY = y + 3 * px
+        if (SystemClock.uptimeMillis() % 3600L < 140L) {
+            canvas.drawLine(eyeX, eyeY + px * 0.2f, eyeX + px * 0.45f, eyeY + px * 0.2f, mascotPaint)
         } else {
-            canvas.drawLine(x + 4 * px, y + 4 * px, x + 5 * px, y + 4 * px, brightPaint)
-            canvas.drawLine(x + 7 * px, y + 4 * px, x + 8 * px, y + 4 * px, brightPaint)
+            canvas.drawRect(eyeX, eyeY, eyeX + px * 0.35f, eyeY + px * 0.35f, bgPaint)
         }
     }
 }
